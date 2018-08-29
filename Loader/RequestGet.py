@@ -2,57 +2,84 @@ import requests
 from abc import ABCMeta,abstractmethod
 import threading
 
-class RequestGet:
+class Request:
 
-    id = None
     __metaclass__ = ABCMeta
 
-    def __init__(self,id,url,params=None,**kwargs):
+    reponse = None
+    id = None
+    url = None
 
-        self.url = url
-        self.params = params
-        self.kwargs = kwargs
+    def __init__(self,id,url):
         self.id = id
-        return
+        self.url = url
+
 
     @abstractmethod
     def Run(self):
-        print(self.url)
-        rep = requests.get(self.url,self.params,**self.kwargs)
+        return
 
-        return rep
+class RequestGet(Request):
 
-class multiDownResponse:
+    def __init__(self,id,url,params=None,**kwargs):
 
-class MultiDown(RequestGet):
+        super().__init__(id,url)
 
-    def __init__(self, id, url,threadNum = 2, params=None, **kwargs):
-        super().__init__(id,url,params,**kwargs)
+        self.params = params
+        self.kwargs = kwargs
+
+        return
+
+    def Run(self):
+
+        self.reponse = requests.get(self.url,self.params,**self.kwargs)
+
+        return
+
+class RequestPost(Request):
+    def __init__(self,id,url, data=None, json=None, **kwargs):
+        super().__init__(id,url)
+        self.data = data
+        self.json = json
+        self.kwargs = kwargs
+        return
+
+    def Run(self):
+
+        self.reponse = requests.post(self.url,self.data,self.json,**self.kwargs)
+
+        return
+
+
+
+
+
+class MultiDown:
+
+    __metaclass__ = ABCMeta
+    threadReponses = None
+    finalContent = b''
+    success = True
+
+    def __init__(self,threadNum = 2):
 
         self.threadNum = threadNum
 
         if threadNum < 2:
             self.threadNum = 2
 
-        self.Reponse = []
-
+        self.threadReponses = []
         return
 
-    def __downPart(self,start,end,index):
-
-        headers = {"Range": "bytes=%s-%s" % (start, end)}
-        rep = requests.get(self.url, self.params, **self.kwargs,headers=headers)
-
-        self.Reponse.insert(index,rep)
+    @abstractmethod
+    def __down(self,start,end,index):
         return
 
-    def Run(self):
-
-        print(self.url)
+    def multiThreadRun(self):
 
         heads = requests.head(self.url).headers
         fileSize = int(heads['Content-Length'])
-        everySize = int(fileSize/self.threadNum)
+        everySize = int(fileSize / self.threadNum)
 
         start = [self.threadNum]
         end = [self.threadNum]
@@ -62,12 +89,12 @@ class MultiDown(RequestGet):
                 start[i] = i * everySize
                 end[i] = fileSize - 1
                 continue
-            start.insert(i,i * everySize)
-            end.insert(i,(i + 1) * everySize - 1)
+            start.insert(i, i * everySize)
+            end.insert(i, (i + 1) * everySize - 1)
 
         threads = []
         for i in range(self.threadNum):
-            t = threading.Thread(target=self.__downPart,args=[start[i],end[i],i])
+            t = threading.Thread(target=self.__down, args=[start[i], end[i], i])
             threads.append(t)
 
         for t in threads:
@@ -76,32 +103,56 @@ class MultiDown(RequestGet):
         for t in threads:
             t.join()
 
-        finalContent = b'' #define bytes
-        success = True
+        #self.finalContent = b''  # define bytes
+        #self.success = True
 
-        for rep in self.Reponse:
+        for rep in self.threadReponses:
             if rep.status_code != 206:
                 success = False
                 break
-            finalContent += rep.content
+            self.finalContent += rep.content
 
-        return self.url,success,finalContent
-'''
-kwargs = {'11':'22','33':'44'}
+        return
 
-keys = kwargs.keys()
-args = str
-for k in keys:
-    args.append( str.format('{0}={1}&', k, kwargs[k]))
+class MultiGetDown(Request,MultiDown):
 
-args = args[:-1]
+    def __init__(self, id, url,threadNum = 2, params=None, **kwargs):
 
-print(args)
-'''
+        MultiDown.__init__(self,threadNum)
+        Request.__init__(self,id,url)
 
-'''
-m = []
-m.insert(1,2)
-m.insert(0,1)
-print(m)
-'''
+        self.params = params
+        self.kwargs = kwargs
+
+        return
+
+    def __down(self,start,end,index):
+
+        headers = {"Range": "bytes=%s-%s" % (start, end)}
+        rep = requests.get(self.url, self.params, **self.kwargs,headers=headers)
+
+        self.threadReponses.insert(index,rep)
+        return
+
+class MultiPostDown(Request,MultiDown):
+
+    def __init__(self, id, url,threadNum = 2, data=None, json=None, **kwargs):
+
+        MultiDown.__init__(self,threadNum)
+        Request.__init__(self,id,url)
+
+        self.data = data
+        self.json = json
+        self.kwargs = kwargs
+
+        return
+
+    def __down(self,start,end,index):
+
+        headers = {"Range": "bytes=%s-%s" % (start, end)}
+
+        rep = requests.post(self.url, self.data, self.json, **self.kwargs,headers = headers)
+
+        self.threadReponses.insert(index,rep)
+
+        return

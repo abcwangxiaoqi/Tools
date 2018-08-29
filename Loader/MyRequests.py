@@ -32,10 +32,10 @@ class MyRequests:
             if self.queueLock.acquire():
                 if self.reqQueue.empty() == False :
                     req = self.reqQueue.get()
-                    r = req.Run()
+                    req.Run()
 
                     if self.cbMap.get(req.id) != None:
-                        self.cbMap.get(req.id)(r)
+                        self.cbMap.get(req.id)(req)
                 self.queueLock.release()
         return
 
@@ -63,24 +63,25 @@ class MyRequests:
         if callback != None:
             self.cbMap[id] = callback
 
-        req = RequestGet.MultiDown(id, url,threadNum, params, **kwargs)
+        req = RequestGet.MultiGetDown(id, url,threadNum, params, **kwargs)
         self.reqQueue.put(req)
         return
 
     def PostDown(self):
         return
 
-def cb(url,success,content):
-    print(url)
-    print(success)
-    f = open('test.zip', "wb")
-    f.write(content)
+def cb(reponse):
+    print(reponse.url)
+    print(reponse.success)
+    f = open('test.txt','+wb')
+    f.write(reponse.finalContent)
     f.close()
 
     return
 
 
 mreq = MyRequests()
-url = 'http://192.168.10.105:8090/file/zip/Scene_01.zip'
+#url = 'http://192.168.10.105:8090/file/zip/Scene_01.zip'
+url = 'http://127.0.0.1:5000/api/down/txt/1.txt'
 mreq.GetDown(url, cb,2, stream=True, timeout=5)
 
