@@ -2,7 +2,7 @@ import requests
 from abc import ABCMeta,abstractmethod
 import threading
 
-class Request:
+class Base:
 
     __metaclass__ = ABCMeta
 
@@ -19,7 +19,7 @@ class Request:
     def Run(self):
         return
 
-class RequestGet(Request):
+class Get(Base):
 
     def __init__(self,id,url,params=None,**kwargs):
 
@@ -36,7 +36,7 @@ class RequestGet(Request):
 
         return
 
-class RequestPost(Request):
+class Post(Base):
     def __init__(self,id,url, data=None, json=None, **kwargs):
         super().__init__(id,url)
         self.data = data
@@ -50,18 +50,13 @@ class RequestPost(Request):
 
         return
 
+class MultiDownBase:
 
-
-
-
-class MultiDown:
-
-    __metaclass__ = ABCMeta
     threadReponses = None
-    finalContent = b''
+    finalContent = b'' # define bytes
     success = True
 
-    def __init__(self,threadNum = 2):
+    def __init__(self,down,threadNum = 2):
 
         self.threadNum = threadNum
 
@@ -69,18 +64,14 @@ class MultiDown:
             self.threadNum = 2
 
         self.threadReponses = []
+
+        self.down = down
         return
 
-    @abstractmethod
-    def __down(self,start,end,index):
-        return
-
-    def multiThreadRun(self):
-
+    def MultiThreadsRun(self):
         heads = requests.head(self.url).headers
         fileSize = int(heads['Content-Length'])
         everySize = int(fileSize / self.threadNum)
-
         start = [self.threadNum]
         end = [self.threadNum]
 
@@ -94,7 +85,7 @@ class MultiDown:
 
         threads = []
         for i in range(self.threadNum):
-            t = threading.Thread(target=self.__down, args=[start[i], end[i], i])
+            t = threading.Thread(target=self.down, args=[start[i], end[i], i])
             threads.append(t)
 
         for t in threads:
@@ -102,9 +93,6 @@ class MultiDown:
 
         for t in threads:
             t.join()
-
-        #self.finalContent = b''  # define bytes
-        #self.success = True
 
         for rep in self.threadReponses:
             if rep.status_code != 206:
@@ -114,12 +102,11 @@ class MultiDown:
 
         return
 
-class MultiGetDown(Request,MultiDown):
+class GetMultiDown(Base,MultiDownBase):
 
     def __init__(self, id, url,threadNum = 2, params=None, **kwargs):
-
-        MultiDown.__init__(self,threadNum)
-        Request.__init__(self,id,url)
+        MultiDownBase.__init__(self,self.__down,threadNum)
+        Base.__init__(self,id,url)
 
         self.params = params
         self.kwargs = kwargs
@@ -127,19 +114,20 @@ class MultiGetDown(Request,MultiDown):
         return
 
     def __down(self,start,end,index):
-
         headers = {"Range": "bytes=%s-%s" % (start, end)}
         rep = requests.get(self.url, self.params, **self.kwargs,headers=headers)
 
         self.threadReponses.insert(index,rep)
         return
 
-class MultiPostDown(Request,MultiDown):
+    def Run(self):
+        MultiDownBase.MultiThreadsRun(self)
+
+class PostMultiDown(Base,MultiDownBase):
 
     def __init__(self, id, url,threadNum = 2, data=None, json=None, **kwargs):
-
-        MultiDown.__init__(self,threadNum)
-        Request.__init__(self,id,url)
+        MultiDownBase.__init__(self,self.__down,threadNum)
+        Base.__init__(self,id,url)
 
         self.data = data
         self.json = json
@@ -156,3 +144,6 @@ class MultiPostDown(Request,MultiDown):
         self.threadReponses.insert(index,rep)
 
         return
+
+    def Run(self):
+        MultiDownBase.MultiThreadsRun(self)
