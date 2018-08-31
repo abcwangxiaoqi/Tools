@@ -8,7 +8,7 @@ def __writefile(file,start,end,content):
     if __fileLock.acquire():
         f = open(file,'wb')
         f.seek(start)
-        f.write(content[start:end])
+        f.write(content[start:end+1])
         f.close()
         __fileLock.release()
 
@@ -44,5 +44,13 @@ def MultiThreadWrite(file,content,threadNum = 2):
 
     for t in threads:
         t.join()
+
+    return
+
+def writefile(file,content):
+
+    f = open(file, 'wb')
+    f.write(content)
+    f.close()
 
     return

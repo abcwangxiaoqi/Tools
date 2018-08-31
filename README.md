@@ -35,6 +35,10 @@ myrequests.Stop()
 
 **使用方法:**  
 ```
+from FileOperate import *
 
+# 多线程写入
+filewrite.MultiThreadWrite(url,content)
+filewrite.writefile(url,content)
 ```  
 **注意:** 对于请求网络数据，多线程可能能够提高效率，但是对于本地磁盘 IO 操作，多线程大部分时候反而会降低性能，原因在于机械硬盘写入数据时候磁头需要不断移动定位。
